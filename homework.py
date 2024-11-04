@@ -16,9 +16,11 @@ load_dotenv()
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
+
 HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
@@ -83,13 +85,13 @@ def get_api_answer(timestamp):
             msg = 'Неверное значение from_date'
             homework_logger.error(msg)
             raise HomeworkApiError(msg)
-        if response.status_code == 401:
+        elif response.status_code == 401:
             msg = 'Неверное значение PRACTICUM_TOKEN'
             homework_logger.error(msg)
             raise HomeworkApiError(msg)
-        if response.status_code != 200:
+        elif response.status_code != 200:
             homework_logger.error(
-                f'Не получен ответ от API. Код ответа: {response.status_code}'
+                f'Статус ответа API не 200. Код ответа: {response.status_code}'
             )
             raise requests.exceptions.HTTPError
         return response.json()
@@ -140,7 +142,7 @@ def main():
             try:
                 homework = api_response['homeworks'][0]
                 send_message(bot, parse_status(homework))
-                timestamp = api_response['current_date']
+                timestamp = api_response.get('current_date', timestamp)
             except IndexError:
                 homework_logger.debug('Пока нет ответа от ревьювера')
         except Exception as error:
