@@ -11,7 +11,6 @@ from telebot import TeleBot
 from telebot.apihelper import ApiException
 
 from exceptions import (
-    VariableMissing,
     HomeworkKeyError,
     HomeworkApiError,
     SendMessageError,
