@@ -57,6 +57,8 @@ def check_tokens():
         return (
             f'Проверьте доступность переменных: {", ".join(missing_tokens)}.'
         )
+    else:
+        return False
 
 
 def send_message(bot, message):
@@ -80,25 +82,26 @@ def get_api_answer(timestamp):
             'params': {'from_date': timestamp},
         }
         response = requests.get(**request_kwargs)
-        if response.status_code == 400:
-            raise HomeworkApiError(
-                f'Неверное значение from_date. {request_kwargs}'
-            )
-        elif response.status_code == 401:
-            raise HomeworkApiError(
-                f'Неверное значение PRACTICUM_TOKEN. {request_kwargs}'
-            )
-        elif response.status_code != 200:
-            raise HomeworkApiError(
-                f'Статус ответа API не 200. Код ответа: {response.status_code}'
-                f'Параметры запроса: {request_kwargs}'
-            )
-        return response.json()
     except RequestException as error:
         raise HomeworkApiError(
             f'Ошибка запроса к API – {error}. '
             f'Параметры запроса: {request_kwargs}'
         ) from error
+    else:
+        if response.status_code == 400:
+            raise HomeworkApiError(
+                f'Неверное значение from_date. {request_kwargs}'
+            )
+        if response.status_code == 401:
+            raise HomeworkApiError(
+                f'Неверное значение PRACTICUM_TOKEN. {request_kwargs}'
+            )
+        if response.status_code != 200:
+            raise HomeworkApiError(
+                f'Статус ответа API не 200. Код ответа: {response.status_code}'
+                f'Параметры запроса: {request_kwargs}'
+            )
+        return response.json()
 
 
 def check_response(response):
@@ -107,11 +110,11 @@ def check_response(response):
         raise TypeError(
             f'Ответ от API не словарь. Тип ответа – {type(response)}'
         )
-    elif response.get('homeworks') is None:
+    if response.get('homeworks') is None:
         raise HomeworkResponseError(
             'В ответе нет ключа "homeworks".'
         )
-    elif not isinstance(response['homeworks'], list):
+    if not isinstance(response['homeworks'], list):
         raise TypeError(
             'Домашки передаются не списком, '
             f'а {type(response["homeworks"])}'
@@ -122,36 +125,36 @@ def parse_status(homework):
     """Извлекает данные из словаря и готовит сообщение для отправки в TG."""
     if 'homework_name' not in homework:
         raise HomeworkKeyError('В ответе отсутствует имя домашки')
-    elif 'status' not in homework:
+    if 'status' not in homework:
         raise HomeworkKeyError('В ответе отсутствует статус домашки')
-    elif homework.get('status') not in HOMEWORK_VERDICTS:
+    if homework.get('status') not in HOMEWORK_VERDICTS:
         raise HomeworkKeyError(
             f'В ответе неожиданный статус домашки: {homework.get("status")}'
         )
-    homework_name = homework['homework_name']
     return str(
-        f'Изменился статус проверки работы "{homework_name}". '
+        f'Изменился статус проверки работы "{homework["homework_name"]}". '
         f'{HOMEWORK_VERDICTS[homework["status"]]}'
     )
 
 
 def main():
     """Основная логика работы бота."""
-    if check_tokens() is not None:
+    if check_tokens():
         logging.critical(check_tokens())
-        raise VariableMissing(check_tokens())
+        sys.exit(check_tokens())
     bot = TeleBot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time())
+    timestamp = int(time.time()) - 86400
+    status_message = ''
     while True:
         try:
             api_response = get_api_answer(timestamp)
             check_response(api_response)
             homeworks = api_response['homeworks']
-            if len(homeworks) > 0:
+            if len(homeworks):
                 new_message = parse_status(homeworks[0])
-                if globals().get('status_message') != new_message:
+                if new_message != status_message:
+                    send_message(bot, new_message)
                     status_message = new_message
-                    send_message(bot, status_message)
             else:
                 logging.debug('В ответе нет данных о домашке')
             timestamp = api_response.get('current_date', timestamp)
