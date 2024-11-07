@@ -143,7 +143,7 @@ def main():
         logging.critical(check_tokens())
         sys.exit(check_tokens())
     bot = TeleBot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time()) - 86400
+    timestamp = int(time.time())
     status_message = ''
     while True:
         try:
